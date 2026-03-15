@@ -1,0 +1,86 @@
+@page "/sessions"
+@rendermode InteractiveServer
+@using AuditDemo.Models
+@using AuditDemo.Services
+@inject ChecklistService ChecklistService
+@inject NavigationManager Nav
+
+<PageTitle>Audit Sessions</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Audit Sessions</h2>
+        <button class="btn btn-primary" @onclick="() => showForm = true">+ New Session</button>
+    </div>
+
+    @if (showForm)
+    {
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h5>New Audit Session</h5>
+                <div class="mb-3">
+                    <label class="form-label">Fund Name</label>
+                    <input class="form-control" @bind="newFundName" placeholder="e.g. Smith Family SMSF" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Financial Year</label>
+                    <input class="form-control" @bind="newFinancialYear" placeholder="e.g. 2024-2025" />
+                </div>
+                <button class="btn btn-success me-2" @onclick="CreateSession">Create</button>
+                <button class="btn btn-secondary" @onclick="() => showForm = false">Cancel</button>
+            </div>
+        </div>
+    }
+
+    @if (sessions == null)
+    {
+        <p>Loading...</p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var session in sessions)
+            {
+                var completed = session.ChecklistItems.Count(i => i.IsCompleted);
+                var total = session.ChecklistItems.Count;
+                var percent = total > 0 ? (completed * 100 / total) : 0;
+
+                <a href="/checklist/@session.Id" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">@session.FundName</h6>
+                            <small class="text-muted">FY @session.FinancialYear ¡¤ Created @session.CreatedAt.ToString("dd MMM yyyy")</small>
+                        </div>
+                        <div class="text-end" style="min-width:120px">
+                            <small>@completed / @total</small>
+                            <div class="progress mt-1" style="height:6px">
+                                <div class="progress-bar" style="width:@percent%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<AuditSession>? sessions;
+    private bool showForm = false;
+    private string newFundName = "";
+    private string newFinancialYear = "2024-2025";
+
+    protected override async Task OnInitializedAsync()
+    {
+        sessions = await ChecklistService.GetSessionsAsync();
+    }
+
+    private async Task CreateSession()
+    {
+        if (string.IsNullOrWhiteSpace(newFundName)) return;
+        await ChecklistService.CreateSessionAsync(newFundName, newFinancialYear);
+        sessions = await ChecklistService.GetSessionsAsync();
+        showForm = false;
+        newFundName = "";
+    }
+}

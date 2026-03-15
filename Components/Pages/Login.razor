@@ -1,0 +1,28 @@
+@page "/login"
+@using Microsoft.AspNetCore.Identity
+@using AuditDemo.Models
+
+<PageTitle>Login</PageTitle>
+
+<div class="container mt-4" style="max-width:480px">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h3 class="mb-4">Sign In</h3>
+
+            <form method="post" action="/LoginAction">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" type="email" name="email" placeholder="you@example.com" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <input class="form-control" type="password" name="password" />
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Sign In</button>
+            </form>
+            <p class="text-center mt-3 text-muted">
+                No account? <a href="/register">Register</a>
+            </p>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,176 @@
+@page "/assistant"
+@rendermode InteractiveServer
+@inject OpenAIClient OpenAIClient
+
+<PageTitle>AI Assistant</PageTitle>
+
+<style>
+    .chat-box {
+        scroll-behavior: smooth;
+    }
+    .message-bubble {
+        animation: fadeIn 0.3s ease-in;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .typing-cursor::after {
+        content: '|';
+        animation: blink 0.7s infinite;
+    }
+    @@keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+    }
+</style>
+
+<div class="container mt-4" style="max-width:800px">
+    <h2>SMSF Audit AI Assistant</h2>
+    <p class="text-muted">Ask anything about SMSF audit requirements and compliance.</p>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body chat-box" id="chatBox" style="height:420px; overflow-y:auto;">
+            @if (messages.Count == 0)
+            {
+                <div class="text-center text-muted mt-5">
+                    <i class="bi bi-robot fs-1"></i>
+                    <p class="mt-2">Ask me anything about SMSF auditing...</p>
+                    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => QuickAsk("What is the sole purpose test?"))">What is the sole purpose test?</button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => QuickAsk("What are the contribution caps for 2024-25?"))">Contribution caps 2024-25?</button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => QuickAsk("What is the in-house assets rule?"))">In-house assets rule?</button>
+                    </div>
+                </div>
+            }
+            @foreach (var msg in messages)
+            {
+                <div class="mb-3 message-bubble @(msg.Role == "user" ? "text-end" : "")">
+                    <span class="badge @(msg.Role == "user" ? "bg-primary" : "bg-secondary") mb-1">
+                        @(msg.Role == "user" ? "You" : "AI Assistant")
+                    </span>
+                    <div class="@(msg.Role == "user" ? "bg-primary text-white" : "bg-light") p-3 rounded d-inline-block"
+                         style="max-width:80%; text-align:left; white-space:pre-wrap;">
+                        @msg.Content
+                        @if (msg == messages.LastOrDefault() && msg.Role == "assistant" && isStreaming)
+                        {
+                            <span class="typing-cursor"></span>
+                        }
+                    </div>
+                </div>
+            }
+            @if (isLoading && !isStreaming)
+            {
+                <div class="mb-3">
+                    <span class="badge bg-secondary mb-1">AI Assistant</span>
+                    <div class="bg-light p-3 rounded d-inline-block">
+                        <div class="d-flex gap-1">
+                            <span class="spinner-grow spinner-grow-sm"></span>
+                            <span class="spinner-grow spinner-grow-sm" style="animation-delay:0.15s"></span>
+                            <span class="spinner-grow spinner-grow-sm" style="animation-delay:0.3s"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="input-group">
+        <input class="form-control form-control-lg"
+               placeholder="e.g. What is the sole purpose test?"
+               @bind="userInput"
+               @onkeydown="HandleKey"
+               disabled="@isLoading" />
+        <button class="btn btn-primary px-4" @onclick="SendMessage" disabled="@isLoading">
+            <i class="bi bi-send-fill"></i>
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+</div>
+
+@code {
+    private string userInput = "";
+    private string errorMessage = "";
+    private bool isLoading = false;
+    private bool isStreaming = false;
+
+    private List<(string Role, string Content)> messages = new();
+
+    private async Task HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isLoading) await SendMessage();
+    }
+
+    private async Task QuickAsk(string question)
+    {
+        userInput = question;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isLoading) return;
+
+        errorMessage = "";
+        var input = userInput.Trim();
+        userInput = "";
+
+        messages.Add(("user", input));
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var chatClient = OpenAIClient.GetChatClient("gpt-4o-mini");
+
+            var chatMessages = new List<OpenAI.Chat.ChatMessage>
+            {
+                OpenAI.Chat.ChatMessage.CreateSystemMessage(
+                    "You are an expert SMSF auditor assistant. " +
+                    "Help auditors with questions about Self-Managed Superannuation Fund auditing, " +
+                    "Australian compliance requirements, and best practices. " +
+                    "Keep answers concise and practical."),
+            };
+
+            foreach (var msg in messages)
+            {
+                if (msg.Role == "user")
+                    chatMessages.Add(OpenAI.Chat.ChatMessage.CreateUserMessage(msg.Content));
+                else
+                    chatMessages.Add(OpenAI.Chat.ChatMessage.CreateAssistantMessage(msg.Content));
+            }
+
+            messages.Add(("assistant", ""));
+            isStreaming = true;
+            StateHasChanged();
+
+            var streamResult = chatClient.CompleteChatStreamingAsync(chatMessages);
+            await foreach (var chunk in streamResult)
+            {
+                foreach (var part in chunk.ContentUpdate)
+                {
+                    var last = messages[messages.Count - 1];
+                    messages[messages.Count - 1] = (last.Role, last.Content + part.Text);
+                    StateHasChanged();
+                    await Task.Delay(1);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (messages.LastOrDefault().Role == "assistant" && messages.Last().Content == "")
+                messages.RemoveAt(messages.Count - 1);
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            isStreaming = false;
+            StateHasChanged();
+        }
+    }
+}

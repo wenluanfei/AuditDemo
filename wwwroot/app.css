@@ -1,0 +1,69 @@
+html, body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+a, .btn-link {
+    color: #0071c1;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #0071c1;
+    border-color: #0071c1;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid red;
+}
+
+.validation-message {
+    color: red;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20d%3D%27M1.751%2020h20.498c.966%200%201.545-1.048%201.051-1.88l-10.249-17.501c-.483-.826-1.619-.826-2.102%200L.7%2018.12C.206%2018.952.785%2020%201.751%2020z%27%20fill%3D%27%23ffc107%27%2F%3E%3Cpath%20d%3D%27M11%208v4h2V8h-2zm0%206v2h2v-2h-2z%27%20fill%3D%27%23fff%27%2F%3E%3C%2Fsvg%3E) no-repeat 1rem/1.8rem, #b32121;
+    border-radius: 0.25rem;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 0 0 3.6rem;
+}
+
+.page-transition {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.nav-item a.active {
+    background-color: rgba(255,255,255,0.15);
+    border-radius: 6px;
+}

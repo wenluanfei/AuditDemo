@@ -1,0 +1,165 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@using AuditDemo.Models
+@using AuditDemo.Services
+@inject ChecklistService ChecklistService
+
+<PageTitle>Dashboard</PageTitle>
+
+<style>
+    .stat-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important;
+    }
+    .fade-in {
+        animation: fadeIn 0.4s ease-in;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .progress-bar {
+        transition: width 1s ease;
+    }
+</style>
+
+<div class="container mt-4 fade-in">
+    <h2 class="mb-4">Audit Dashboard</h2>
+
+    @if (sessions == null)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 mb-5">
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm stat-card border-0">
+                    <div class="card-body py-4">
+                        <div class="display-5 fw-bold text-primary">@sessions.Count</div>
+                        <p class="text-muted mb-0 mt-1">Total Audits</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm stat-card border-0">
+                    <div class="card-body py-4">
+                        <div class="display-5 fw-bold text-success">@completedSessions</div>
+                        <p class="text-muted mb-0 mt-1">Completed</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm stat-card border-0">
+                    <div class="card-body py-4">
+                        <div class="display-5 fw-bold text-warning">@inProgressSessions</div>
+                        <p class="text-muted mb-0 mt-1">In Progress</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm stat-card border-0">
+                    <div class="card-body py-4">
+                        <div class="display-5 fw-bold text-secondary">@notStartedSessions</div>
+                        <p class="text-muted mb-0 mt-1">Not Started</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Progress by Fund</h5>
+                        @foreach (var session in sessions)
+                        {
+                            var completed = session.ChecklistItems.Count(i => i.IsCompleted);
+                            var total = session.ChecklistItems.Count;
+                            var percent = total > 0 ? (completed * 100 / total) : 0;
+                            var color = percent == 100 ? "bg-success" : percent > 50 ? "bg-primary" : percent > 0 ? "bg-warning" : "bg-secondary";
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="fw-semibold">@session.FundName</span>
+                                    <span class="text-muted small">@completed / @total (@percent%)</span>
+                                </div>
+                                <div class="progress" style="height:10px">
+                                    <div class="progress-bar @color" style="width:@percent%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Status Breakdown</h5>
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    window.renderStatusChart = function(completed, inProgress, notStarted) {
+        const ctx = document.getElementById('statusChart');
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completed', 'In Progress', 'Not Started'],
+                datasets: [{
+                    data: [completed, inProgress, notStarted],
+                    backgroundColor: ['#198754', '#0d6efd', '#6c757d'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    };
+</script>
+
+@code {
+    [Inject] IJSRuntime JS { get; set; } = default!;
+
+    private List<AuditSession>? sessions;
+
+    private int completedSessions => sessions?.Count(s =>
+        s.ChecklistItems.Count > 0 && s.ChecklistItems.All(i => i.IsCompleted)) ?? 0;
+
+    private int inProgressSessions => sessions?.Count(s =>
+        s.ChecklistItems.Any(i => i.IsCompleted) &&
+        !s.ChecklistItems.All(i => i.IsCompleted)) ?? 0;
+
+    private int notStartedSessions => sessions?.Count(s =>
+        s.ChecklistItems.All(i => !i.IsCompleted)) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        sessions = await ChecklistService.GetSessionsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && sessions != null)
+        {
+            await JS.InvokeVoidAsync("renderStatusChart", completedSessions, inProgressSessions, notStartedSessions);
+        }
+    }
+}

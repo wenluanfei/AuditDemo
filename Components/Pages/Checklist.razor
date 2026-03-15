@@ -1,0 +1,142 @@
+@page "/checklist/{SessionId:int}"
+@rendermode InteractiveServer
+@using AuditDemo.Models
+@using AuditDemo.Services
+@inject ChecklistService ChecklistService
+@inject PdfService PdfService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Audit Checklist</PageTitle>
+
+<style>
+    .checklist-item {
+        transition: all 0.3s ease;
+    }
+    .checklist-item:hover {
+        background-color: #f8f9fa;
+    }
+    .fade-in {
+        animation: fadeIn 0.4s ease-in;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .progress {
+        transition: width 0.5s ease;
+    }
+</style>
+
+<div class="container mt-4 fade-in">
+    @if (session == null)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <h2>@session.FundName</h2>
+                <p class="text-muted mb-0">Financial Year: @session.FinancialYear</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-danger" @onclick="ExportPdf" disabled="@isExporting">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-pdf me-1"></i>
+                    }
+                    Export PDF
+                </button>
+                <a href="/sessions" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+            </div>
+        </div>
+
+        <div class="progress mb-2" style="height:10px">
+            <div class="progress-bar bg-success" style="width:@progressPercent%"></div>
+        </div>
+        <p class="text-muted mb-4"><strong>@completedCount / @totalCount</strong> items completed (@progressPercent%)</p>
+
+        @foreach (var category in session.ChecklistItems.Select(i => i.Category).Distinct())
+        {
+            <h5 class="mt-4 border-bottom pb-2">@category</h5>
+            <div class="list-group mb-3">
+                @foreach (var item in session.ChecklistItems.Where(i => i.Category == category))
+                {
+                    <div class="list-group-item checklist-item">
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="checkbox"
+                                   class="form-check-input mt-0"
+                                   checked="@item.IsCompleted"
+                                   @onchange="() => Toggle(item)" />
+                            <span class="@(item.IsCompleted ? "text-decoration-line-through text-muted" : "")">
+                                @item.Description
+                            </span>
+                            @if (item.IsCompleted)
+                            {
+                                <span class="badge bg-success ms-auto">Done</span>
+                            }
+                        </div>
+                        @if (item.IsCompleted)
+                        {
+                            <input class="form-control form-control-sm mt-2"
+                                   placeholder="Add notes..."
+                                   value="@item.Notes"
+                                   @onchange="e => UpdateNotes(item, e.Value?.ToString() ?? string.Empty)" />
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int SessionId { get; set; }
+
+    private AuditSession? session;
+    private bool isExporting = false;
+    private int completedCount => session?.ChecklistItems.Count(i => i.IsCompleted) ?? 0;
+    private int totalCount => session?.ChecklistItems.Count ?? 0;
+    private int progressPercent => totalCount > 0 ? (completedCount * 100 / totalCount) : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = await ChecklistService.GetSessionAsync(SessionId);
+    }
+
+    private async Task Toggle(ChecklistItem item)
+    {
+        await ChecklistService.ToggleItemAsync(item.Id);
+        session = await ChecklistService.GetSessionAsync(SessionId);
+    }
+
+    private async Task UpdateNotes(ChecklistItem item, string notes)
+    {
+        await ChecklistService.UpdateNotesAsync(item.Id, notes);
+    }
+
+    private async Task ExportPdf()
+    {
+        if (session == null) return;
+        isExporting = true;
+        try
+        {
+            var pdfBytes = PdfService.GenerateAuditReport(session);
+            var base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("downloadPdf", base64, $"audit-{session.FundName}-{session.FinancialYear}.pdf");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+}

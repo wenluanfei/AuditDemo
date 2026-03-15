@@ -1,0 +1,77 @@
+@page "/register"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using AuditDemo.Models
+@inject UserManager<AppUser> UserManager
+@inject NavigationManager Nav
+
+<PageTitle>Register</PageTitle>
+
+<div class="container mt-4" style="max-width:480px">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h3 class="mb-4">Create Account</h3>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input class="form-control" @bind="fullName" placeholder="Jane Smith" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" type="email" @bind="email" placeholder="you@example.com" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input class="form-control" type="password" @bind="password" />
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Confirm Password</label>
+                <input class="form-control" type="password" @bind="confirmPassword" />
+            </div>
+            <button class="btn btn-primary w-100" @onclick="RegisterUser">Register</button>
+            <p class="text-center mt-3 text-muted">
+                Already have an account? <a href="/login">Sign in</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string fullName = "";
+    private string email = "";
+    private string password = "";
+    private string confirmPassword = "";
+    private string errorMessage = "";
+
+    private async Task RegisterUser()
+    {
+        if (password != confirmPassword)
+        {
+            errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        var user = new AppUser
+        {
+            UserName = email,
+            Email = email,
+            FullName = fullName
+        };
+
+        var result = await UserManager.CreateAsync(user, password);
+
+        if (result.Succeeded)
+        {
+            Nav.NavigateTo("/login");
+        }
+        else
+        {
+            errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+}
